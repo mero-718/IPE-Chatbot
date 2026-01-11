@@ -16,13 +16,9 @@ export default function Home() {
   // const API_URL = 'http://localhost:8000'
   const API_URL = 'https://nonemulative-jenise-sneakily.ngrok-free.dev';
   
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: 'Hello! I\'m Aeon, here to help with the inpatient Psychiatric Evaluation intake.\n\nHi, I\'m Aeon! I will complete your initial Psychiatric Evaluation. Feel free to provide details as you see fit.\n\nLet me ask you a few questions about the patient\'s background.\n\nWhat\'s the patient\'s name?',
-      timestamp: new Date(),
-    },
-  ])
+  // Initialize messages with a stable timestamp to avoid hydration mismatches
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isMounted, setIsMounted] = useState(false)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,13 +26,27 @@ export default function Home() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Initialize messages on client side only to avoid hydration issues
+  useEffect(() => {
+    setIsMounted(true)
+    setMessages([
+      {
+        role: 'assistant',
+        content: 'Hello! I\'m Aeon, here to help with the inpatient Psychiatric Evaluation intake.\n\nHi, I\'m Aeon! I will complete your initial Psychiatric Evaluation. Feel free to provide details as you see fit.\n\nLet me ask you a few questions about the patient\'s background.\n\nWhat\'s the patient\'s name?',
+        timestamp: new Date(),
+      },
+    ])
+  }, [])
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    if (isMounted) {
+      scrollToBottom()
+    }
+  }, [messages, isMounted])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -120,14 +130,25 @@ export default function Home() {
   }
 
   const clearChat = () => {
-    setMessages([
-      {
-        role: 'assistant',
-        content: 'Hello! I\'m Aeon, here to help with the inpatient Psychiatric Evaluation intake.\n\nHi, I\'m Aeon! I will complete your initial Psychiatric Evaluation. Feel free to provide details as you see fit.\n\nLet me ask you a few questions about the patient\'s background.\n\nWhat\'s the patient\'s name?',
-        timestamp: new Date(),
-      },
-    ])
-    setError(null)
+    if (isMounted) {
+      setMessages([
+        {
+          role: 'assistant',
+          content: 'Hello! I\'m Aeon, here to help with the inpatient Psychiatric Evaluation intake.\n\nHi, I\'m Aeon! I will complete your initial Psychiatric Evaluation. Feel free to provide details as you see fit.\n\nLet me ask you a few questions about the patient\'s background.\n\nWhat\'s the patient\'s name?',
+          timestamp: new Date(),
+        },
+      ])
+      setError(null)
+    }
+  }
+
+  // Don't render until mounted to avoid hydration mismatches
+  if (!isMounted) {
+    return (
+      <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    )
   }
 
   return (
@@ -200,16 +221,18 @@ export default function Home() {
                 }`}
               >
                 <div className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</div>
-                <div
-                  className={`text-xs mt-2 ${
-                    message.role === 'user' ? 'text-blue-100' : 'text-gray-400'
-                  }`}
-                >
-                  {message.timestamp.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </div>
+                {message.timestamp && (
+                  <div
+                    className={`text-xs mt-2 ${
+                      message.role === 'user' ? 'text-blue-100' : 'text-gray-400'
+                    }`}
+                  >
+                    {message.timestamp.toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           ))}

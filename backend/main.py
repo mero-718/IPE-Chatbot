@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from openai import OpenAI
 import os
@@ -26,15 +27,37 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://ipe-chatbot.vercel.app/",
+        "https://ipe-chatbot.vercel.app",
         "https://nonemulative-jenise-sneakily.ngrok-free.app",
         "https://nonemulative-jenise-sneakily.ngrok-free.de",
         "https://nonemulative-jenise-sneakily.ngrok-free.dev",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+# Middleware to handle ngrok browser warning and ensure CORS headers
+@app.middleware("http")
+async def add_cors_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Add ngrok skip browser warning header
+    response.headers["ngrok-skip-browser-warning"] = "true"
+    # Ensure CORS headers are present for allowed origins
+    origin = request.headers.get("origin")
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://ipe-chatbot.vercel.app",
+        "https://nonemulative-jenise-sneakily.ngrok-free.app",
+        "https://nonemulative-jenise-sneakily.ngrok-free.de",
+        "https://nonemulative-jenise-sneakily.ngrok-free.dev",
+    ]
+    if origin and origin in allowed_origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 # Initialize OpenAI client
 api_key = os.getenv("OPENAI_API_KEY")

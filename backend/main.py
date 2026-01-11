@@ -21,7 +21,7 @@ app = FastAPI(
     version="3.0.0"
 )
 
-# CORS middleware
+# CORS middleware - must be added before other middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -33,16 +33,44 @@ app.add_middleware(
         "https://nonemulative-jenise-sneakily.ngrok-free.dev",
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_methods=["*"],  # Allow all methods including OPTIONS
     allow_headers=["*"],
     expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 # Middleware to handle ngrok browser warning and ensure CORS headers
 @app.middleware("http")
 async def add_cors_headers(request: Request, call_next):
+    # Handle preflight OPTIONS requests explicitly
+    if request.method == "OPTIONS":
+        origin = request.headers.get("origin", "")
+        allowed_origins = [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "https://ipe-chatbot.vercel.app",
+            "https://nonemulative-jenise-sneakily.ngrok-free.app",
+            "https://nonemulative-jenise-sneakily.ngrok-free.de",
+            "https://nonemulative-jenise-sneakily.ngrok-free.dev",
+        ]
+        # Return CORS headers for allowed origins
+        if origin in allowed_origins:
+            return Response(
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization, ngrok-skip-browser-warning",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Max-Age": "3600",
+                    "ngrok-skip-browser-warning": "true",
+                }
+            )
+        # If origin not in list, still return 200 but without CORS headers (will be blocked by browser)
+        return Response(status_code=200)
+    
     response = await call_next(request)
-    # Add ngrok skip browser warning header
+    # Add ngrok skip browser warning header to all responses
     response.headers["ngrok-skip-browser-warning"] = "true"
     # Ensure CORS headers are present for allowed origins
     origin = request.headers.get("origin")
@@ -680,6 +708,21 @@ Before allowing form submission, ensure ALL of these are collected:
 - Show empathy for the evaluation process
 - Avoid medical jargon when possible, but use appropriate terminology
 - Acknowledge the user's responses to show you're listening"""
+
+@app.options("/{full_path:path}")
+async def options_handler(full_path: str, request: Request):
+    """Handle preflight OPTIONS requests for CORS"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+            "ngrok-skip-browser-warning": "true",
+        }
+    )
 
 @app.get("/")
 async def root():
